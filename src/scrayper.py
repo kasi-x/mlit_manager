@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from dataclasses import field
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -37,7 +38,9 @@ class ScraypingConfig:
     mode: DownloadMode = DownloadMode.ACTUAL
     download_all: bool = False
     latest_year_only: bool = True
-    prefer_format: FileFormat = FileFormat.GEOJSON
+    prefer_formats: list[FileFormat] | FileFormat = field(
+        default_factory=lambda: [FileFormat.GEOJSON, FileFormat.SHAPEFILE],
+    )
     target_catalogs: list[str] | None = None
     target_years: list[str] | None = None
     chunk_size: int = 8192
@@ -58,18 +61,22 @@ class ScraypingConfig:
         if not data_dir:
             data_dir = cls._get_external_data_dir()
 
-        prefer_format = args.get("prefer_format", "geojson")
+        prefer_formats = args.get("prefer_format", ["geojson", "shapefile"])
         try:
-            prefer_format = FileFormat(prefer_format)
+            # condition check if str
+            if isinstance(prefer_formats, str):
+                prefer_formats = FileFormat(prefer_formats)
+            else:
+                prefer_formats = [FileFormat(format_str) for format_str in prefer_formats]
         except ValueError:
-            prefer_format = FileFormat.OTHER
+            prefer_formats = FileFormat.OTHER
 
         return cls(
             data_dir=Path(data_dir),
             mode=DownloadMode(args.get("mode", "actual")),
             download_all=args.get("download_all", False),
             latest_year_only=args.get("latest_year_only", True),
-            prefer_format=prefer_format,
+            prefer_formats=prefer_formats,
             target_catalogs=args.get("target_catalogs"),
             target_years=args.get("target_years"),
         )

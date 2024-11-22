@@ -4,7 +4,6 @@ from pathlib import Path
 
 import structlog
 
-from src.base_class import FileFormat
 from src.data_filter import DatasetCollection
 from src.scrayper import ScraypingConfig
 from src.scrayper import ScraypingManager
@@ -66,8 +65,8 @@ class CatalogProcessor:
                 logger.info("Skipping polygon data catalog")
                 continue
 
+            reduced_path = self.paths["catalogs"] / catalog.title / "reduced_file_info.json"
             try:
-                reduced_path = self.paths["catalogs"] / catalog.title / "reduced_file_info.json"
                 collection = DatasetCollection.load(reduced_path)
 
                 logger.info(
@@ -104,20 +103,6 @@ class CatalogProcessor:
             new_collection = catalog.parse_html(html_path)
             new_collection.save(info_path)
 
-            # if existing_collection:
-            #     merged_collection = DatasetCollection(
-            #         existing_collection.items + new_collection.items,
-            #     )
-            # else:
-            #     merged_collection = new_collection
-            #
-            # merged_collection.save(info_path)
-            # logger.info(
-            #     "Saved catalog data",
-            #     catalog_title=catalog.title,
-            #     total_items=len(merged_collection.items),
-            # )
-
         except Exception as e:
             logger.exception(
                 "Error processing catalog data",
@@ -129,31 +114,26 @@ class CatalogProcessor:
 
     def _process_reduced_info(self, catalog: CatalogItem) -> None:
         """Process reduced information for a catalog."""
-        raw_path = self.paths["catalogs"] / catalog.title / "file_info.json"
+        file_info_path = self.paths["catalogs"] / catalog.title / "file_info.json"
         reduced_path = self.paths["catalogs"] / catalog.title / "reduced_file_info.json"
         reduced_path.parent.mkdir(parents=True, exist_ok=True)
+        if reduced_path.exists():
+            logger.info("Skip generating reduced_file_info", catalog_title=catalog.title)
+            return
 
         try:
-            existing_reduced = self._load_existing_collection(reduced_path)
-            raw_collection = DatasetCollection.load(raw_path)
+            raw_collection = DatasetCollection.load(file_info_path)
 
             new_reduced = raw_collection.reduce_data(
                 self.config.latest_year_only,
-                FileFormat(self.config.prefer_format),
+                self.config.prefer_formats,
             )
+            new_reduced.save(reduced_path)
 
-            if existing_reduced:
-                merged_collection = DatasetCollection(
-                    existing_reduced.items + new_reduced.items,
-                )
-            else:
-                merged_collection = new_reduced
-
-            merged_collection.save(reduced_path)
             logger.info(
                 "Saved reduced data",
                 catalog_title=catalog.title,
-                total_items=len(merged_collection.items),
+                total_items=len(new_reduced.items),
             )
 
         except Exception as e:

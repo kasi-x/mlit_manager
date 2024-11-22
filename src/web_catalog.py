@@ -112,6 +112,11 @@ class CatalogManager:
     def __init__(self, html_content: str) -> None:
         self.catalogs: list[CatalogItem] = self._parse_catalogs(html_content)
 
+    def add_extra_catalogs(self, extra_catalogs: list[CatalogItem]) -> None:
+        """追加のカタログを追加."""
+        # self.catalogs.extend(extra_catalogs)
+        self.catalogs = extra_catalogs
+
     def _parse_catalogs(self, html_content: str) -> list[CatalogItem]:
         """HTMLからカタログ一覧を抽出."""
         pattern = r'<li class="collection-item">\s*<a href="([^"]+)">\s*(.+?)\s*</a>'

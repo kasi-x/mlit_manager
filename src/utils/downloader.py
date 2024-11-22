@@ -1,6 +1,7 @@
 import asyncio
 import time
 from dataclasses import dataclass
+from dataclasses import field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -117,18 +118,24 @@ class DownloadConfig:
     data_dir: Path | None = None
     download_all: bool = False
     latest_year_only: bool = True
-    prefer_format: FileFormat = FileFormat.GEOJSON
+    prefer_formats: list[FileFormat] | FileFormat = field(
+        default_factory=lambda: [FileFormat.GEOJSON, FileFormat.SHAPEFILE],
+    )
     target_catalogs: list[str] | None = None
     target_years: list[str] | None = None
     target_formats: list[FileFormat] | None = None
 
     @classmethod
     def from_dict(cls, args: dict[str, Any]) -> "DownloadConfig":
+        prefer_format_value = args.get("prefer_format", ["geojson", "shapefile"])
+        if isinstance(prefer_format_value, str):
+            prefer_format_value = [prefer_format_value]
+        prefer_formats = [FileFormat(fmt) if isinstance(fmt, str) else fmt for fmt in prefer_format_value]
         return cls(
             data_dir=Path(args["data_dir"]) if "data_dir" in args else None,
             download_all=args.get("download_all", False),
             latest_year_only=args.get("latest_year_only", True),
-            prefer_format=FileFormat(args.get("prefer_format", "geojson")),
+            prefer_formats=prefer_formats,
             target_catalogs=args.get("target_catalogs"),
             target_years=args.get("target_years"),
             target_formats=[FileFormat(f) for f in args.get("target_formats", [])]

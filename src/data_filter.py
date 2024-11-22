@@ -1,4 +1,5 @@
 import json
+import sys
 from collections import defaultdict
 from collections.abc import Callable
 from collections.abc import Iterator
@@ -78,7 +79,7 @@ class GeographicDataset:
         """地域データの読み取り."""
         for key in ["地域", "メッシュ番号"]:
             if value := data.get(key):
-                return value
+                return value.split("(")[0].split("（")[0].strip()
         msg = "地域情報が見つかりません"
         raise ValueError(msg)
 
@@ -92,7 +93,7 @@ class GeographicDataset:
                 file_size=data["ファイル容量"],
                 region=cls.read_area(data),
                 year=cls.read_year(data),
-                geodetic_system=data["測地系"],
+                geodetic_system=data.get("測地系", data["説明"]),
                 file_url=urljoin(cls.BASE_URL, data["file_path"]),
                 local_html=str(local_html_path),
                 detail_url="https://nlftp.mlit.go.jp/ksj/gml/datalist/" + local_html_path.name,
@@ -149,9 +150,11 @@ class DatasetCollection:
     def reduce_data(
         self,
         latest_only: bool = False,
-        prefer_format: FileFormat | None = FileFormat.GEOJSON,
+        prefer_formats: list[FileFormat] | FileFormat | None = None,
     ) -> "DatasetCollection":
         """データセットを最適化して返す."""
+        if prefer_formats is None:
+            prefer_formats = [FileFormat.GEOJSON, FileFormat.SHAPEFILE]
         if not self.items:
             return DatasetCollection()
 
@@ -160,11 +163,14 @@ class DatasetCollection:
 
         # 最新年度の抽出
         if latest_only:
+            if "前のデータ" in self.items[0].category or "H29国政局推計" in self.items[0].category:
+                return DatasetCollection(items=[])
+
             year_groups = self._get_latest_year_group(year_groups)
 
         selected_items = []
         for year_items in year_groups.values():
-            best_items = self._select_best_datasets(DatasetCollection(items=year_items), prefer_format)
+            best_items = self._select_best_datasets(DatasetCollection(items=year_items), prefer_formats)
             selected_items.extend(best_items)
 
         return DatasetCollection(items=selected_items)
@@ -172,7 +178,7 @@ class DatasetCollection:
     def _select_best_datasets(
         self,
         collection: "DatasetCollection",
-        prefer_format: FileFormat | None,
+        prefer_formats: list[FileFormat] | FileFormat | None,
     ) -> list[GeographicDataset]:
         """最適なデータセットを選択."""
         without_seibikyoku = collection.filter(lambda x: x.region_type != RegionType.INFRASTRUCTURE)
@@ -183,11 +189,12 @@ class DatasetCollection:
         if nationwide.items:
             filtered = nationwide
 
-        # 形式による絞り込み
-        if prefer_format and filtered.items:
-            format_filtered = filtered.filter_by_format(prefer_format)
-            if format_filtered.items:
-                filtered = format_filtered
+        if prefer_formats and filtered.items:
+            for prefer_format in [prefer_formats] if isinstance(prefer_formats, FileFormat) else prefer_formats:
+                format_filtered = filtered.filter_by_format(prefer_format)
+                if format_filtered.items:
+                    filtered = format_filtered
+                    break
 
         # 地域の整理
         if not nationwide.items:
