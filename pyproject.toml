@@ -2,7 +2,7 @@
 name = "mlit-manager"
 version = "0.1.0"
 description = ""
-authors = ["kashi-x <kashimiya.exe@gmail.com>"]
+authors = ["kashi-x"]
 license = "MIT"
 readme = "README.md"
 packages = [{ include = "src" }]
